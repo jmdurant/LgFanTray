@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="utf-8"?>
+<Project Sdk="WixToolset.Sdk/6.0.2">
+  <PropertyGroup>
+    <OutputType>Package</OutputType>
+    <OutputName>LgFanTraySetup</OutputName>
+    <WixBuildArguments>-arch x86</WixBuildArguments>
+    <SuppressValidation>true</SuppressValidation>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="Product.wxs" />
+    <Compile Include="LgFanTrayUI_InstallDir.wxs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <BindPath Include="$(MSBuildProjectDirectory)\..\src\LgFanTray\bin\Release">
+      <BindName>LgFanTrayBin</BindName>
+    </BindPath>
+    <BindPath Include="$(MSBuildProjectDirectory)\..\deps">
+      <BindName>EcProbeBin</BindName>
+    </BindPath>
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="WixToolset.Util.wixext" Version="6.0.2" />
+    <PackageReference Include="WixToolset.Netfx.wixext" Version="6.0.2" />
+    <PackageReference Include="WixToolset.UI.wixext" Version="6.0.2" />
+  </ItemGroup>
+</Project>

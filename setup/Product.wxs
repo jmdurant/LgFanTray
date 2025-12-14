@@ -1,0 +1,141 @@
+<Wix xmlns="http://wixtoolset.org/schemas/v4/wxs" xmlns:ui="http://wixtoolset.org/schemas/v4/wxs/ui">
+  <Package Name="LG Fan Tray" Manufacturer="StagWare" Version="!(bind.fileVersion.LgFanTray.exe)" Language="1033" Scope="perMachine" UpgradeCode="E2A5B6B7-52C3-4CE3-A2D9-2D07C7D8F1A0">
+    <MajorUpgrade Schedule="afterInstallInitialize" AllowDowngrades="no" AllowSameVersionUpgrades="yes" DowngradeErrorMessage="A newer version of LG Fan Tray is already installed." />
+
+    <PropertyRef Id="WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED" />
+    <Launch Condition="Installed OR WIX_IS_NETFRAMEWORK_48_OR_LATER_INSTALLED" Message="LG Fan Tray requires .NET Framework 4.8 or greater." />
+
+    <Media Id="1" Cabinet="LgFanTray.cab" EmbedCab="yes" CompressionLevel="high" />
+
+    <Icon Id="fan.ico" SourceFile="..\src\LgFanTray\fan.ico" />
+    <Property Id="ARPPRODUCTICON" Value="fan.ico" />
+
+    <Property Id="WIXUI_INSTALLDIR" Value="INSTALLFOLDER" />
+    <UIRef Id="LgFanTrayUI_InstallDir_X86" />
+
+    <Property Id="LGFANTRAY_RUNATSTARTUP" Value="0" />
+
+    <Property Id="WIXUI_EXITDIALOGOPTIONALCHECKBOXTEXT" Value="Launch LG Fan Tray" />
+
+    <Property Id="WixShellExecTarget" Value="[#LgFanTray.exe]" />
+    <CustomAction Id="LaunchLgFanTray" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixShellExec" Execute="immediate" Impersonate="yes" Return="ignore" />
+
+    <SetProperty Id="CreateStartupTask" Value="&quot;[SystemFolder]schtasks.exe&quot; /Create /F /SC ONLOGON /RL HIGHEST /TN &quot;LG Fan Tray&quot; /TR &quot;\&quot;[INSTALLFOLDER]LgFanTray.exe\&quot;&quot;" Before="CreateStartupTask" Sequence="execute" />
+    <CustomAction Id="CreateStartupTask" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <SetProperty Id="RemoveStartupTask" Value="&quot;[SystemFolder]schtasks.exe&quot; /Delete /F /TN &quot;LG Fan Tray&quot;" Before="RemoveStartupTask" Sequence="execute" />
+    <CustomAction Id="RemoveStartupTask" BinaryRef="Wix4UtilCA_$(sys.BUILDARCHSHORT)" DllEntry="WixQuietExec" Execute="deferred" Impersonate="no" Return="ignore" />
+
+    <UI>
+      <Dialog Id="LgFanTrayOptionsDlg" Width="370" Height="270" Title="LG Fan Tray Setup">
+        <Control Id="Back" Type="PushButton" X="180" Y="243" Width="56" Height="17" Text="!(loc.WixUIBack)" />
+        <Control Id="Next" Type="PushButton" X="236" Y="243" Width="56" Height="17" Default="yes" Text="!(loc.WixUINext)" />
+        <Control Id="Cancel" Type="PushButton" X="304" Y="243" Width="56" Height="17" Cancel="yes" Text="!(loc.WixUICancel)">
+          <Publish Event="SpawnDialog" Value="CancelDlg" />
+        </Control>
+        <Control Id="BottomLine" Type="Line" X="0" Y="234" Width="373" Height="0" />
+        <Control Id="Title" Type="Text" X="15" Y="15" Width="340" Height="20" Transparent="yes" NoPrefix="yes" Text="Additional options" />
+        <Control Id="Description" Type="Text" X="15" Y="40" Width="340" Height="30" Transparent="yes" NoPrefix="yes" Text="Choose whether LG Fan Tray should start automatically." />
+        <Control Id="RunAtStartup" Type="CheckBox" X="20" Y="85" Width="330" Height="18" Property="LGFANTRAY_RUNATSTARTUP" CheckBoxValue="1" Text="Run at startup" />
+      </Dialog>
+
+      <Publish Dialog="ExitDialog" Control="Finish" Event="DoAction" Value="LaunchLgFanTray" Order="1" Condition="WIXUI_EXITDIALOGOPTIONALCHECKBOX = 1 AND NOT Installed" />
+    </UI>
+
+    <InstallExecuteSequence>
+      <Custom Action="CreateStartupTask" After="InstallFiles" Condition="LGFANTRAY_RUNATSTARTUP = 1 AND NOT Installed" />
+      <Custom Action="RemoveStartupTask" Before="RemoveFiles" Condition="REMOVE = &quot;ALL&quot;" />
+    </InstallExecuteSequence>
+
+    <StandardDirectory Id="ProgramFilesFolder">
+      <Directory Id="INSTALLFOLDER" Name="LG Fan Tray">
+        <Directory Id="PLUGINSFOLDER" Name="Plugins" />
+      </Directory>
+    </StandardDirectory>
+
+    <StandardDirectory Id="ProgramMenuFolder">
+      <Directory Id="ProgramMenuProductFolder" Name="LG Fan Tray" />
+    </StandardDirectory>
+
+    <Feature Id="LgFanTray" Title="LG Fan Tray" Level="1">
+      <ComponentGroupRef Id="LgFanTrayFiles" />
+      <ComponentGroupRef Id="LgFanTrayDirectories" />
+      <ComponentGroupRef Id="EcProbeFiles" />
+      <ComponentGroupRef Id="PluginFiles" />
+    </Feature>
+
+    <ComponentGroup Id="LgFanTrayFiles" Directory="INSTALLFOLDER">
+      <Component Id="LgFanTrayExe" Guid="*">
+        <File Id="LgFanTray.exe" Source="!(bindpath.LgFanTrayBin)\LgFanTray.exe" KeyPath="yes">
+          <Shortcut Id="LgFanTrayStartMenuShortcut" Directory="ProgramMenuProductFolder" Name="LG Fan Tray" Icon="fan.ico" Advertise="yes" />
+          <Shortcut Id="LgFanTrayDesktopShortcut" Directory="DesktopFolder" Name="LG Fan Tray" Icon="fan.ico" Advertise="yes" />
+        </File>
+      </Component>
+
+      <Component Id="LgFanTrayExeConfig" Guid="*">
+        <File Id="LgFanTray.exe.config" Source="!(bindpath.LgFanTrayBin)\LgFanTray.exe.config" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="LgFanTrayDirectories" Directory="ProgramMenuProductFolder">
+      <Component Id="Dir.ProgramMenuSetup" Guid="*">
+        <RemoveFolder Id="ProgramMenuProductFolder" On="uninstall" />
+        <RegistryValue Root="HKMU" Key="Software\StagWare\LgFanTray" Name="installed" Type="integer" Value="1" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="EcProbeFiles" Directory="INSTALLFOLDER">
+      <Component Id="EcProbeExe" Guid="*">
+        <File Id="EcProbeExeFile" Source="!(bindpath.EcProbeBin)\ec-probe.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="EcProbeExeConfig" Guid="*">
+        <File Id="EcProbeExeConfigFile" Source="!(bindpath.EcProbeBin)\ec-probe.exe.config" KeyPath="yes" />
+      </Component>
+      <Component Id="NbfcExe" Guid="*">
+        <File Id="NbfcExeFile" Source="!(bindpath.EcProbeBin)\nbfc.exe" KeyPath="yes" />
+      </Component>
+      <Component Id="NbfcExeConfig" Guid="*">
+        <File Id="NbfcExeConfigFile" Source="!(bindpath.EcProbeBin)\nbfc.exe.config" KeyPath="yes" />
+      </Component>
+      <Component Id="CliprDll" Guid="*">
+        <File Id="CliprDllFile" Source="!(bindpath.EcProbeBin)\clipr.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="NLogDll" Guid="*">
+        <File Id="NLogDllFile" Source="!(bindpath.EcProbeBin)\NLog.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="StagWareFanControlDll" Guid="*">
+        <File Id="StagWareFanControlDllFile" Source="!(bindpath.EcProbeBin)\StagWare.FanControl.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="StagWareFanControlConfigurationsDll" Guid="*">
+        <File Id="StagWareFanControlConfigurationsDllFile" Source="!(bindpath.EcProbeBin)\StagWare.FanControl.Configurations.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="StagWareBiosInfoDll" Guid="*">
+        <File Id="StagWareBiosInfoDllFile" Source="!(bindpath.EcProbeBin)\StagWare.BiosInfo.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="SystemIOAbstractionsDll" Guid="*">
+        <File Id="SystemIOAbstractionsDllFile" Source="!(bindpath.EcProbeBin)\System.IO.Abstractions.dll" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <ComponentGroup Id="PluginFiles" Directory="PLUGINSFOLDER">
+      <Component Id="ECWindowsPlugin" Guid="*">
+        <File Id="ECWindowsPluginFile" Source="!(bindpath.EcProbeBin)\Plugins\StagWare.Plugins.ECWindows.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="HardwareLpcDll" Guid="*">
+        <File Id="HardwareLpcDllFile" Source="!(bindpath.EcProbeBin)\Plugins\StagWare.Hardware.LPC.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="HardwareDll" Guid="*">
+        <File Id="HardwareDllFile" Source="!(bindpath.EcProbeBin)\Plugins\StagWare.Hardware.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="OpenHardwareMonitorLib" Guid="*">
+        <File Id="OpenHardwareMonitorLibFile" Source="!(bindpath.EcProbeBin)\Plugins\OpenHardwareMonitorLib.dll" KeyPath="yes" />
+      </Component>
+      <Component Id="WinRing0Driver" Guid="*">
+        <File Id="WinRing0DriverFile" Source="!(bindpath.EcProbeBin)\Plugins\WinRing0x64.sys" KeyPath="yes" />
+      </Component>
+    </ComponentGroup>
+
+    <!-- Plugins and ec-probe are shipped from the LgFanTray build output (copied there by LgFanTray.csproj AfterBuild). -->
+
+  </Package>
+</Wix>
