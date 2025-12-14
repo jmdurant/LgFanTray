@@ -55,6 +55,7 @@
   </ItemGroup>
   <ItemGroup>
     <Compile Include="AppSettings.cs" />
+    <Compile Include="BacklightLevel.cs" />
     <Compile Include="EcProbeClient.cs" />
     <Compile Include="FanMode.cs" />
     <Compile Include="HotkeyManager.cs" />

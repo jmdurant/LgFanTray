@@ -10,11 +10,22 @@ namespace LgFanTray
     {
         private const string MutexName = "LgFanTray_SingleInstance";
         private const string PipeName = "LgFanTray_Pipe";
+        private const byte BacklightRegister = 0x72;
+        private const string EcProbeFileName = "ec-probe.exe";
 
         [STAThread]
         public static void Main(string[] args)
         {
-            FanMode? requestedMode = ParseArgs(args);
+            FanMode? requestedFanMode;
+            BacklightLevel? requestedBacklight;
+            ParseArgs(args, out requestedFanMode, out requestedBacklight);
+
+            // Handle backlight-only commands without starting the tray app
+            if (requestedBacklight.HasValue && !requestedFanMode.HasValue)
+            {
+                SetBacklightDirect(requestedBacklight.Value);
+                return;
+            }
 
             bool createdNew;
             using (var mutex = new Mutex(true, MutexName, out createdNew))
@@ -24,47 +35,83 @@ namespace LgFanTray
                     // First instance - run the tray app
                     Application.EnableVisualStyles();
                     Application.SetCompatibleTextRenderingDefault(false);
-                    Application.Run(new TrayApplicationContext(requestedMode));
+                    Application.Run(new TrayApplicationContext(requestedFanMode));
                 }
                 else
                 {
                     // Another instance is running - send command via pipe
-                    if (requestedMode.HasValue)
+                    if (requestedFanMode.HasValue)
                     {
-                        SendCommandToRunningInstance(requestedMode.Value);
+                        SendCommandToRunningInstance(requestedFanMode.Value);
                     }
                 }
             }
         }
 
-        private static FanMode? ParseArgs(string[] args)
+        private static void ParseArgs(string[] args, out FanMode? fanMode, out BacklightLevel? backlight)
         {
+            fanMode = null;
+            backlight = null;
+
             if (args == null || args.Length == 0)
             {
-                return null;
+                return;
             }
 
             string arg = args[0].ToLowerInvariant().TrimStart('-', '/');
 
             switch (arg)
             {
+                // Fan modes
                 case "1":
-                case "low":
-                    return FanMode.Low;
+                case "fan1":
+                case "fanlow":
+                    fanMode = FanMode.Low;
+                    break;
                 case "2":
-                case "normal":
-                    return FanMode.Normal;
+                case "fan2":
+                case "fannormal":
+                    fanMode = FanMode.Normal;
+                    break;
                 case "3":
-                case "high":
-                    return FanMode.High;
+                case "fan3":
+                case "fanhigh":
+                    fanMode = FanMode.High;
+                    break;
                 case "4":
-                case "max":
-                    return FanMode.Max;
+                case "fan4":
+                case "fanmax":
+                    fanMode = FanMode.Max;
+                    break;
                 case "applydefault":
-                    return FanMode.Max; // Default mode on startup
-                default:
-                    return null;
+                    fanMode = FanMode.Max;
+                    break;
+
+                // Backlight levels
+                case "5":
+                case "lightoff":
+                case "backlightoff":
+                    backlight = BacklightLevel.Off;
+                    break;
+                case "6":
+                case "lightlow":
+                case "backlightlow":
+                    backlight = BacklightLevel.Low;
+                    break;
+                case "7":
+                case "lighthigh":
+                case "backlighthigh":
+                    backlight = BacklightLevel.High;
+                    break;
             }
+        }
+
+        private static void SetBacklightDirect(BacklightLevel level)
+        {
+            var ec = new EcProbeClient(EcProbeFileName);
+            string output;
+            string error;
+            ec.TryWriteRegister(BacklightRegister, (byte)level, out output, out error);
         }
 
         private static void SendCommandToRunningInstance(FanMode mode)

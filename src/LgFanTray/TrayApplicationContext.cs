@@ -9,21 +9,28 @@ namespace LgFanTray
 {
     public class TrayApplicationContext : ApplicationContext
     {
-        private const byte ModeRegister = 0xCF;
+        private const byte FanModeRegister = 0xCF;
+        private const byte BacklightRegister = 0x72;
         private const string EcProbeFileName = "ec-probe.exe";
         private const string PipeName = "LgFanTray_Pipe";
 
         private readonly NotifyIcon notifyIcon;
-        private readonly ToolStripMenuItem lowItem;
-        private readonly ToolStripMenuItem normalItem;
-        private readonly ToolStripMenuItem highItem;
-        private readonly ToolStripMenuItem maxItem;
+        private readonly ToolStripMenuItem fanLowItem;
+        private readonly ToolStripMenuItem fanNormalItem;
+        private readonly ToolStripMenuItem fanHighItem;
+        private readonly ToolStripMenuItem fanMaxItem;
+        private readonly ToolStripMenuItem backlightOffItem;
+        private readonly ToolStripMenuItem backlightLowItem;
+        private readonly ToolStripMenuItem backlightHighItem;
 
         private readonly HotkeyManager hotkeyManager;
-        private int hotkeyLowId;
-        private int hotkeyNormalId;
-        private int hotkeyHighId;
-        private int hotkeyMaxId;
+        private int hotkeyFanLowId;
+        private int hotkeyFanNormalId;
+        private int hotkeyFanHighId;
+        private int hotkeyFanMaxId;
+        private int hotkeyBacklightOffId;
+        private int hotkeyBacklightLowId;
+        private int hotkeyBacklightHighId;
 
         private Thread pipeThread;
         private volatile bool running = true;
@@ -32,17 +39,30 @@ namespace LgFanTray
         {
             var menu = new ContextMenuStrip();
 
-            lowItem = new ToolStripMenuItem("Low (Ctrl+Alt+1)", null, (s, e) => SetMode(FanMode.Low));
-            normalItem = new ToolStripMenuItem("Normal (Ctrl+Alt+2)", null, (s, e) => SetMode(FanMode.Normal));
-            highItem = new ToolStripMenuItem("High (Ctrl+Alt+3)", null, (s, e) => SetMode(FanMode.High));
-            maxItem = new ToolStripMenuItem("Max (Ctrl+Alt+4)", null, (s, e) => SetMode(FanMode.Max));
+            // Fan controls
+            var fanMenu = new ToolStripMenuItem("Fan Speed");
+            fanLowItem = new ToolStripMenuItem("Low (Ctrl+Alt+1)", null, (s, e) => SetFanMode(FanMode.Low));
+            fanNormalItem = new ToolStripMenuItem("Normal (Ctrl+Alt+2)", null, (s, e) => SetFanMode(FanMode.Normal));
+            fanHighItem = new ToolStripMenuItem("High (Ctrl+Alt+3)", null, (s, e) => SetFanMode(FanMode.High));
+            fanMaxItem = new ToolStripMenuItem("Max (Ctrl+Alt+4)", null, (s, e) => SetFanMode(FanMode.Max));
+            fanMenu.DropDownItems.Add(fanLowItem);
+            fanMenu.DropDownItems.Add(fanNormalItem);
+            fanMenu.DropDownItems.Add(fanHighItem);
+            fanMenu.DropDownItems.Add(fanMaxItem);
+
+            // Backlight controls
+            var backlightMenu = new ToolStripMenuItem("Keyboard Backlight");
+            backlightOffItem = new ToolStripMenuItem("Off (Ctrl+Alt+5)", null, (s, e) => SetBacklight(BacklightLevel.Off));
+            backlightLowItem = new ToolStripMenuItem("Low (Ctrl+Alt+6)", null, (s, e) => SetBacklight(BacklightLevel.Low));
+            backlightHighItem = new ToolStripMenuItem("High (Ctrl+Alt+7)", null, (s, e) => SetBacklight(BacklightLevel.High));
+            backlightMenu.DropDownItems.Add(backlightOffItem);
+            backlightMenu.DropDownItems.Add(backlightLowItem);
+            backlightMenu.DropDownItems.Add(backlightHighItem);
 
             var exitItem = new ToolStripMenuItem("Exit", null, (s, e) => Exit());
 
-            menu.Items.Add(lowItem);
-            menu.Items.Add(normalItem);
-            menu.Items.Add(highItem);
-            menu.Items.Add(maxItem);
+            menu.Items.Add(fanMenu);
+            menu.Items.Add(backlightMenu);
             menu.Items.Add(new ToolStripSeparator());
             menu.Items.Add(exitItem);
 
@@ -71,7 +91,7 @@ namespace LgFanTray
             // Apply initial mode if specified, otherwise refresh display
             if (initialMode.HasValue)
             {
-                SetMode(initialMode.Value);
+                SetFanMode(initialMode.Value);
             }
             else
             {
@@ -83,18 +103,27 @@ namespace LgFanTray
         {
             int modifiers = HotkeyManager.MOD_CONTROL | HotkeyManager.MOD_ALT;
 
-            try { hotkeyLowId = hotkeyManager.Register(modifiers, Keys.D1); } catch { }
-            try { hotkeyNormalId = hotkeyManager.Register(modifiers, Keys.D2); } catch { }
-            try { hotkeyHighId = hotkeyManager.Register(modifiers, Keys.D3); } catch { }
-            try { hotkeyMaxId = hotkeyManager.Register(modifiers, Keys.D4); } catch { }
+            // Fan hotkeys
+            try { hotkeyFanLowId = hotkeyManager.Register(modifiers, Keys.D1); } catch { }
+            try { hotkeyFanNormalId = hotkeyManager.Register(modifiers, Keys.D2); } catch { }
+            try { hotkeyFanHighId = hotkeyManager.Register(modifiers, Keys.D3); } catch { }
+            try { hotkeyFanMaxId = hotkeyManager.Register(modifiers, Keys.D4); } catch { }
+
+            // Backlight hotkeys
+            try { hotkeyBacklightOffId = hotkeyManager.Register(modifiers, Keys.D5); } catch { }
+            try { hotkeyBacklightLowId = hotkeyManager.Register(modifiers, Keys.D6); } catch { }
+            try { hotkeyBacklightHighId = hotkeyManager.Register(modifiers, Keys.D7); } catch { }
         }
 
         private void OnHotkeyPressed(object sender, int id)
         {
-            if (id == hotkeyLowId) SetMode(FanMode.Low);
-            else if (id == hotkeyNormalId) SetMode(FanMode.Normal);
-            else if (id == hotkeyHighId) SetMode(FanMode.High);
-            else if (id == hotkeyMaxId) SetMode(FanMode.Max);
+            if (id == hotkeyFanLowId) SetFanMode(FanMode.Low);
+            else if (id == hotkeyFanNormalId) SetFanMode(FanMode.Normal);
+            else if (id == hotkeyFanHighId) SetFanMode(FanMode.High);
+            else if (id == hotkeyFanMaxId) SetFanMode(FanMode.Max);
+            else if (id == hotkeyBacklightOffId) SetBacklight(BacklightLevel.Off);
+            else if (id == hotkeyBacklightLowId) SetBacklight(BacklightLevel.Low);
+            else if (id == hotkeyBacklightHighId) SetBacklight(BacklightLevel.High);
         }
 
         private void PipeListenerThread()
@@ -114,7 +143,7 @@ namespace LgFanTray
                             if (int.TryParse(line, out modeValue))
                             {
                                 FanMode mode = (FanMode)modeValue;
-                                notifyIcon.ContextMenuStrip.Invoke((Action)(() => SetMode(mode)));
+                                notifyIcon.ContextMenuStrip.Invoke((Action)(() => SetFanMode(mode)));
                             }
                         }
                     }
@@ -131,31 +160,53 @@ namespace LgFanTray
 
         private void RefreshCheckedMode()
         {
-            byte val;
-            string error;
             var ec = new EcProbeClient(EcProbeFileName);
+            byte fanVal;
+            byte backlightVal;
+            string error;
 
-            if (!ec.TryReadRegister(ModeRegister, out val, out error))
+            // Read fan mode
+            if (ec.TryReadRegister(FanModeRegister, out fanVal, out error))
             {
-                notifyIcon.ShowBalloonTip(3000, "LG Fan Tray", error ?? "Read failed", ToolTipIcon.Error);
-                return;
+                fanLowItem.Checked = fanVal == (byte)FanMode.Low;
+                fanNormalItem.Checked = fanVal == (byte)FanMode.Normal;
+                fanHighItem.Checked = fanVal == (byte)FanMode.High;
+                fanMaxItem.Checked = fanVal == (byte)FanMode.Max;
             }
 
-            lowItem.Checked = val == (byte)FanMode.Low;
-            normalItem.Checked = val == (byte)FanMode.Normal;
-            highItem.Checked = val == (byte)FanMode.High;
-            maxItem.Checked = val == (byte)FanMode.Max;
+            // Read backlight level
+            if (ec.TryReadRegister(BacklightRegister, out backlightVal, out error))
+            {
+                backlightOffItem.Checked = backlightVal == (byte)BacklightLevel.Off;
+                backlightLowItem.Checked = backlightVal == (byte)BacklightLevel.Low;
+                backlightHighItem.Checked = backlightVal == (byte)BacklightLevel.High;
+            }
 
-            notifyIcon.Text = "LG Fan Tray (0xCF=" + val.ToString("X2") + ")";
+            notifyIcon.Text = string.Format("LG Fan Tray (Fan=0x{0:X2}, Light=0x{1:X2})", fanVal, backlightVal);
         }
 
-        private void SetMode(FanMode mode)
+        private void SetFanMode(FanMode mode)
         {
             string output;
             string error;
             var ec = new EcProbeClient(EcProbeFileName);
 
-            if (!ec.TryWriteRegister(ModeRegister, (byte)mode, out output, out error))
+            if (!ec.TryWriteRegister(FanModeRegister, (byte)mode, out output, out error))
+            {
+                notifyIcon.ShowBalloonTip(3000, "LG Fan Tray", error ?? "Write failed", ToolTipIcon.Error);
+                return;
+            }
+
+            RefreshCheckedMode();
+        }
+
+        private void SetBacklight(BacklightLevel level)
+        {
+            string output;
+            string error;
+            var ec = new EcProbeClient(EcProbeFileName);
+
+            if (!ec.TryWriteRegister(BacklightRegister, (byte)level, out output, out error))
             {
                 notifyIcon.ShowBalloonTip(3000, "LG Fan Tray", error ?? "Write failed", ToolTipIcon.Error);
                 return;
@@ -168,11 +219,16 @@ namespace LgFanTray
         {
             running = false;
 
-            // Unregister hotkeys
-            if (hotkeyLowId != 0) hotkeyManager.Unregister(hotkeyLowId);
-            if (hotkeyNormalId != 0) hotkeyManager.Unregister(hotkeyNormalId);
-            if (hotkeyHighId != 0) hotkeyManager.Unregister(hotkeyHighId);
-            if (hotkeyMaxId != 0) hotkeyManager.Unregister(hotkeyMaxId);
+            // Unregister fan hotkeys
+            if (hotkeyFanLowId != 0) hotkeyManager.Unregister(hotkeyFanLowId);
+            if (hotkeyFanNormalId != 0) hotkeyManager.Unregister(hotkeyFanNormalId);
+            if (hotkeyFanHighId != 0) hotkeyManager.Unregister(hotkeyFanHighId);
+            if (hotkeyFanMaxId != 0) hotkeyManager.Unregister(hotkeyFanMaxId);
+
+            // Unregister backlight hotkeys
+            if (hotkeyBacklightOffId != 0) hotkeyManager.Unregister(hotkeyBacklightOffId);
+            if (hotkeyBacklightLowId != 0) hotkeyManager.Unregister(hotkeyBacklightLowId);
+            if (hotkeyBacklightHighId != 0) hotkeyManager.Unregister(hotkeyBacklightHighId);
 
             notifyIcon.Visible = false;
             notifyIcon.Dispose();

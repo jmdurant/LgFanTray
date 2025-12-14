@@ -1,51 +1,70 @@
 # LG Fan Tray
 
-A lightweight Windows system tray application for controlling fan speeds on LG laptops via EC (Embedded Controller) register manipulation.
+A lightweight Windows system tray application for controlling fan speeds and keyboard backlight on LG laptops via EC (Embedded Controller) register manipulation.
 
 ## Features
 
-- **System Tray Control**: Quick access to fan modes from the system tray
-- **Global Hotkeys**: Change fan speed from anywhere using keyboard shortcuts
-- **Command Line Interface**: Control fan speed via command line arguments
+- **System Tray Control**: Quick access to fan modes and keyboard backlight from the system tray
+- **Global Hotkeys**: Change fan speed and backlight from anywhere using keyboard shortcuts
+- **Command Line Interface**: Control fan speed and backlight via command line arguments
 - **Single Instance**: Multiple launches send commands to the running instance
 - **Run at Startup**: Optional Windows Task Scheduler integration for auto-start
 
 ## Fan Modes
 
-| Mode | EC Value | Description |
-|------|----------|-------------|
-| Low | 0x11 | Quietest, minimal cooling |
-| Normal | 0x00 | Default/balanced |
-| High | 0x22 | Increased cooling |
-| Max | 0x44 | Maximum fan speed |
+| Mode | EC Register | EC Value | Description |
+|------|-------------|----------|-------------|
+| Low | 0xCF | 0x11 | Quietest, minimal cooling |
+| Normal | 0xCF | 0x00 | Default/balanced |
+| High | 0xCF | 0x22 | Increased cooling |
+| Max | 0xCF | 0x44 | Maximum fan speed |
+
+## Keyboard Backlight
+
+| Level | EC Register | EC Value | Description |
+|-------|-------------|----------|-------------|
+| Off | 0x72 | 0x80 | Backlight disabled |
+| Low | 0x72 | 0xA2 | Dim backlight |
+| High | 0x72 | 0xA4 | Bright backlight |
 
 ## Keyboard Shortcuts
 
 | Shortcut | Action |
 |----------|--------|
-| Ctrl+Alt+1 | Set Low mode |
-| Ctrl+Alt+2 | Set Normal mode |
-| Ctrl+Alt+3 | Set High mode |
-| Ctrl+Alt+4 | Set Max mode |
+| Ctrl+Alt+1 | Fan: Low |
+| Ctrl+Alt+2 | Fan: Normal |
+| Ctrl+Alt+3 | Fan: High |
+| Ctrl+Alt+4 | Fan: Max |
+| Ctrl+Alt+5 | Backlight: Off |
+| Ctrl+Alt+6 | Backlight: Low |
+| Ctrl+Alt+7 | Backlight: High |
 
 ## Command Line Usage
 
 ```bash
-# Set fan mode directly
-LgFanTray.exe -1        # Low
-LgFanTray.exe -low      # Low
-LgFanTray.exe -2        # Normal
-LgFanTray.exe -normal   # Normal
-LgFanTray.exe -3        # High
-LgFanTray.exe -high     # High
-LgFanTray.exe -4        # Max
-LgFanTray.exe -max      # Max
+# Fan modes
+LgFanTray.exe -1            # Fan Low
+LgFanTray.exe -2            # Fan Normal
+LgFanTray.exe -3            # Fan High
+LgFanTray.exe -4            # Fan Max
+LgFanTray.exe -fanlow       # Fan Low
+LgFanTray.exe -fannormal    # Fan Normal
+LgFanTray.exe -fanhigh      # Fan High
+LgFanTray.exe -fanmax       # Fan Max
+
+# Keyboard backlight
+LgFanTray.exe -5            # Backlight Off
+LgFanTray.exe -6            # Backlight Low
+LgFanTray.exe -7            # Backlight High
+LgFanTray.exe -lightoff     # Backlight Off
+LgFanTray.exe -lightlow     # Backlight Low
+LgFanTray.exe -lighthigh    # Backlight High
 
 # Launch without setting a mode (just start tray app)
 LgFanTray.exe
 ```
 
-If the app is already running, command line arguments will send the command to the running instance via named pipe (no duplicate windows).
+If the app is already running, fan mode commands will send the command to the running instance via named pipe (no duplicate windows). Backlight commands execute directly.
 
 ## Installation
 
@@ -70,7 +89,11 @@ If the app is already running, command line arguments will send the command to t
 
 ## How It Works
 
-LG Fan Tray uses `ec-probe.exe` (from the NBFC project) to read/write EC register `0xCF`, which controls the fan mode on LG laptops. The app wraps ec-probe in a user-friendly tray interface with hotkey support.
+LG Fan Tray uses `ec-probe.exe` (from the NBFC project) to read/write EC registers:
+- **0xCF** - Fan mode control
+- **0x72** - Keyboard backlight control
+
+The EC register values were discovered through trial and error using `ec-probe dump` and `ec-probe monitor` while toggling settings on an LG Gram laptop.
 
 ### Dependencies (in deps/)
 
@@ -123,7 +146,8 @@ LgFanTray/
 │       ├── Program.cs              # Entry point, single-instance, CLI parsing
 │       ├── TrayApplicationContext.cs # Tray icon, menu, hotkeys, IPC
 │       ├── EcProbeClient.cs        # ec-probe.exe wrapper
-│       ├── FanMode.cs              # Fan mode enum
+│       ├── FanMode.cs              # Fan mode enum (0xCF values)
+│       ├── BacklightLevel.cs       # Backlight level enum (0x72 values)
 │       ├── HotkeyManager.cs        # Global hotkey registration
 │       └── AppSettings.cs          # Settings definitions
 ├── setup/                  # WiX installer project
@@ -136,10 +160,29 @@ LgFanTray/
 └── README.md
 ```
 
+## Discovering EC Registers
+
+To find additional EC-controlled features on your LG laptop:
+
+```bash
+# Dump all EC registers
+ec-probe dump
+
+# Monitor for changes (toggle a feature while monitoring)
+ec-probe monitor -i 2 -t 30
+
+# Read a specific register
+ec-probe read 0xCF
+
+# Write to a register (be careful!)
+ec-probe write 0xCF 0x44 -v
+```
+
 ## Credits
 
 - Based on [NBFC (NoteBook Fan Control)](https://github.com/hirschmann/nbfc) by hirschmann
 - Uses ec-probe for EC register access
+- EC register values discovered by James DuRant
 
 ## License
 
