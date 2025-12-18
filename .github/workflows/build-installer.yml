@@ -1,0 +1,39 @@
+name: Build Installer
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build-msi:
+    runs-on: windows-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup MSBuild
+        uses: microsoft/setup-msbuild@v2
+
+      - name: Setup NuGet
+        uses: NuGet/setup-nuget@v2
+
+      - name: Setup .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "8.0.x"
+
+      - name: Restore solution
+        run: nuget restore .\LgFanTray.sln
+
+      - name: Build app (Release)
+        run: msbuild .\LgFanTray.sln /m /p:Configuration=Release /p:Platform="Any CPU"
+
+      - name: Build WiX installer (Release)
+        run: dotnet build .\setup\LgFanTraySetup.wixproj -c Release
+
+      - name: Upload MSI artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: LgFanTraySetup
+          path: setup\bin\Release\**\*.msi
